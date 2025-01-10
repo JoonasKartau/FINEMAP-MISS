@@ -1,30 +1,23 @@
 #' Fine-mapping meta-analyses with missing information
 #'
-#' \code{FINEMAPMISS} performs Bayesian variable selection on a set of genetic
+#' \code{FINEMAP} performs Bayesian variable selection on a set of genetic
 #' variants and a phenotype, using marginal effect estimates \eqn{\boldsymbol{\widehat \beta}},
 #'  their standard errors \eqn{\boldsymbol{s}}, and  a reference LD panel \eqn{\boldsymbol{R}}
-#'  as input. \cr
-#'  \code{FINEMAPMISS} differs from previous methods, as it allows for the combination
-#'  of multiple datasets across biobanks, while also functioning with missing data. \cr
-#'  If given separate data, this function will automatically perform the meta-analysis
-#'  and fine-map the data. \cr
-#'  If the data have been combined into a single dataset in advance, \code{FINEMAPMISS}
-#'  can still be run, but with reduced accuracy.
+#'  as input. This is a recreation of the C++ implementation by Christian Benner and Matti Pirinen.
+#'  Not recommended for meta-analyzed GWAS data.
 #'
 #' @param ses A vector or matrix of GWAS marginal effect standard errors.
 #' Takes the form of a vector if there is only a single dataset or the data has
 #' been combined in advance. Otherwise, it is a matrix where each column contains
 #' the standard errors for one dataset. For any unobserved variants in a study,
-#' the standard errors should be set to Inf.
+#' the standard errors should be set to \code{Inf}.
 #' @param betas A vector or matrix of GWAS marginal effects.
 #' Takes the form of a vector if there is only a single dataset or the data has
 #' been combined in advance. Otherwise, it is a matrix where each column contains
 #' the marginal effects for one dataset. For any unobserved variants in a study,
-#' the marginal effects should be set to 0.
+#' the marginal effects should be set to \code{0}.
 #' @param R Reference LD matrix for the set of analyzed variants.
-#' @param tau Prior standard error for the casual effects. Set by default to 0.05.
-#' @param adj Adjustment constant \eqn{\varepsilon}, shrinks the correlations in
-#'  \eqn{\boldsymbol{R_M}} to make its inversion stable.
+#' @param tau Prior standard error for the casual effects. Set by default to \code{0.05}.
 #' @param n_reps Maximum number of Stochastic Shotgun Search (SSS) iterations.
 #' @param prob_threshold SSS termination threshold, based on probability mass added at each iteration.
 #' @param max_causals Maximum number of causal variants.
@@ -34,16 +27,12 @@
 #' @param meta_analyze Binary variable, should the data be meta-analyzed? If data has been
 #' combined in advance, should be set to \code{FALSE}.
 #' @param quiet Should the current progress of SSS be repressed?
-#' @param supplied_matrices If the vector \eqn{\boldsymbol{\widehat z}^{T} \boldsymbol{R_M}^{-1}\boldsymbol{R}_{\boldsymbol{\gamma}} }
-#' and matrix \eqn{\mathbb{I}_p + \boldsymbol{R}_{\boldsymbol{\gamma}}^{T} \boldsymbol{R_M}^{-1} \boldsymbol{R}_{\boldsymbol{\gamma}} }
-#' have been computed in advance, they can be input as a list to avoid computing them again.
-#' @param adj_match Should the \eqn{\boldsymbol{R}} be adjusted in a similar way to \eqn{\boldsymbol{R_M}} when computing log Bayes-factors?
 #' @param RM If \eqn{\boldsymbol{R_M}} has been computed in advance, it can be provided as input.
 #' @param estimate_M Should \eqn{\boldsymbol{M}} be estimated? This should be used if data has been meta-analyzed in advance.
 #' @param beta_shrink Should beta shrinkage in the
 #' marginal effect covariances be applied?
 #' @param n_studies Number of studies. Should be equal to the number of columns in
-#' ses abnd betas. If the data has been combined in advance, set to 1.
+#' ses abnd betas. If the data has been combined in advance, set to \code{1}.
 #' @param variant_sample_sizes Vector of combined sample sizes per variant, from the meta-analysis.
 #' @param max_overlap Binary parameter denoting whether the maximum sample
 #' overlap is assumed when estimating \eqn{\boldsymbol{M}}.
@@ -51,16 +40,18 @@
 #' Takes the form of a vector if there is only a single dataset or the data has
 #' been combined in advance. Otherwise, it is a matrix where each column contains
 #' the variant frequencies for one dataset. For any unobserved variants in a study,
-#' the marginal effects should be set to 0.
+#' the marginal effects should be set to \code{0}.
 #' @param scaled_data Has the data been scaled with allele frequencies in advance?
 #' @param use_N Are the variant sample sizes or marginal effect standard errors used
 #' for fine-mapping?
+#' @param INFO Vector of variant imputation INFO scores.
+#' @param cholesky Is cholesky decomposition used for matrix inversion? If not base R \code{solve} is used.
 #'
 #' @return A list of objects
 #' \describe{
 #'   \item{\code{pips}}{Numeric vector of posterior inclusion probabilities per variant.}
 #'   \item{\code{stored_configs}}{A matrix of evaluated configurations and associated information.
-#'    Column 1. causal configuration, 2. log Bayes-factor, 3. size of configuration, 4. Is this a unique configuration?}
+#'    Columns: 1. causal configuration, 2. log Bayes-factor, 3. size of configuration, 4. Is this a unique configuration?}
 #'   \item{\code{cred}}{List or matrix of credible sets.}
 #'   \item{\code{post_k}}{Posterior probability distribution for the number of causal variants from \code{0:max_causals}}
 #' }
@@ -68,17 +59,85 @@
 #' @export
 #'
 #' @examples
-FINEMAPMISS <- function(ses, betas, R, tau = 0.05, adj = 0.0001,
-                             n_reps = 50,
-                             prob_threshold, max_causals = 5,
-                             cred_sizes = NULL, cred_eval, meta_analyze = T,
-                             quiet = T, supplied_matrices = NULL, adj_match = T,
-                             RM = NULL,
-                             estimate_M = FALSE,
-                             beta_shrink = TRUE, n_studies,
-                             variant_sample_sizes = NULL,
-                             max_overlap = T, freqs,
-                             scaled_data = F, use_N = F, INFO = NULL){
+original_FINEMAP <- function(ses, betas, R, tau = 0.05,
+                        n_reps = 50,
+                        prob_threshold = 0.001, max_causals = 5,
+                        cred_sizes = NULL, cred_eval = T, meta_analyze = T,
+                        quiet = T,
+                        RM = NULL,
+                        estimate_M = FALSE,
+                        beta_shrink = TRUE, n_studies,
+                        variant_sample_sizes = NULL,
+                        max_overlap = T, freqs,
+                        scaled_data = F, use_N = F, INFO = NULL,
+                        cholesky = T){
+  # Checking for suitable input.
+  ses <- as.matrix(ses)
+  betas <- as.matrix(betas)
+
+  if(!all(dim(ses) == dim(betas)) | !all(dim(ses) == dim(freqs))){
+    stop("Error: dimensions of ses, betas, and freqs must be equal.")
+  }
+  if(!is.numeric(n_studies)){
+    stop("Error: non-numeric input for n_studies")
+  }
+
+  if(dim(ses)[2] != n_studies | dim(betas)[2] != n_studies | dim(freqs)[2] != n_studies){
+    stop("Error: Number of columns of ses, betas, freqs do not match n_studies parameter.")
+  }
+
+  if(dim(R)[1] != dim(R)[2]){
+    stop("Error: R is not a square matrix")
+  }
+  if(dim(R)[1] != dim(ses)[1]){
+    stop("Error: dimensions of R do not match data, (ses, betas, freqs)")
+  }
+  if(!is.numeric(R)){
+    stop("Error: non-numeric input for R")
+  }
+
+  if(!is.null(RM)){
+    if(dim(RM)[1] != dim(RM)[2]){
+      stop("Error: RM is not a square matrix")
+    }
+    if(dim(RM)[1] != dim(ses)[1]){
+      stop("Error: dimensions of RM do not match data, (ses, betas, freqs)")
+    }
+    if(!is.numeric(RM)){
+      stop("Error: non-numeric input for RM")
+    }
+  }
+  if(!is.numeric(betas)){
+    stop("Error: non-numeric input for betas")
+  }
+  if(!is.numeric(ses)){
+    stop("Error: non-numeric input for ses")
+  }
+  if(!is.numeric(freqs)){
+    stop("Error: non-numeric input for freqs")
+  }
+  if(!is.numeric(tau)){
+    stop("Error: non-numeric input for tau")
+  }
+  if(!is.numeric(n_reps)){
+    stop("Error: non-numeric input for freqs")
+  }
+  if(!is.numeric(max_causals)){
+    stop("Error: non-numeric input for freqs")
+  }
+  if(!is.numeric(prob_threshold)){
+    stop("Error: non-numeric input for prob_threshold")
+  }
+  if(!is.null(cred_sizes)){
+    if(!is.numeric(cred_sizes)){
+      stop("Error: non-numeric input for cred_sizes")
+    }
+  }
+  if(!is.null(variant_sample_sizes)){
+    if(!is.numeric(variant_sample_sizes)){
+      stop("Error: non-numeric input for variant_sample_sizes")
+    }
+  }
 
   #Scaling data
   if(scaled_data == F){
@@ -92,58 +151,38 @@ FINEMAPMISS <- function(ses, betas, R, tau = 0.05, adj = 0.0001,
     meta_analysis <- IVW(betas = betas, ses = ses)
     beta_meta <- meta_analysis[[1]]
     se_meta <- meta_analysis[[2]]
+
+    INFO_meta <- IVW(betas = INFO, ses = ses)[[1]]
   } else {
     beta_meta <- betas
     se_meta <- ses
   }
-
+  z <- beta_meta/se_meta
 
   # Creating sample size overlap matrix M
   p <- length(beta_meta)
   if(is.null(INFO)){
-    INFO <- rep(1,p)
+    INFO_meta <- rep(1,p)
   }
 
-  print("Creating M")
+
+  I2 <- diag(INFO_meta)
+  if(use_N == T){
+    se_meta <- sqrt((1 - beta_meta^2)/variant_sample_sizes)
+    INFO_meta <- rep(1,p)
+  }
+
+
+  Si_Ii <- diag(1/se_meta/sqrt(INFO_meta))
+
+
+  print("Creating sample overlap matrix")
 
   if(is.null(RM)){
     RM <- .create_RM_matrix(ses = ses, betas = betas, R = R, beta_shrink = beta_shrink,
-                   n_studies = n_studies, estimate_M = estimate_M, p = p,
-                   max_overlap = max_overlap)
+                            n_studies = n_studies, estimate_M = estimate_M, p = p,
+                            max_overlap = max_overlap)
   }
-
-  # Inverting RM with a diagonal adjustment.
-  print("Inverting")
-  if(is.null(supplied_matrices)){
-    RMi <- solve((RM*(1 - adj) + diag(adj, p)))
-    # Making the prior variance of a causal variant a vector of length p.
-    tau_vec <- rep(tau[1], p)/se_meta
-    z <- beta_meta/se_meta
-
-    # Pre-multiplying matrices. We compute these only once and use specific
-    #   cols and rows as needed, instead of computing them individually
-    #   for each computation.
-    print("Pre-multiplication")
-
-    if(use_N == T){
-      N <- sqrt(variant_sample_sizes/(1 - beta_meta^2))
-    } else {
-      N <- 1/se_meta/sqrt(INFO)
-    }
-    if("adj_match" == T){
-      RMi_R <-  tau[1]*RMi %*%  diag(N) %*% (R*(1 - adj) + diag(adj,p)) %*% diag(sqrt(INFO))
-      tR_RMi_R <-  tau[1]*( t(diag(N) %*% (R*(1 - adj) + diag(adj,p)) %*% diag(sqrt(INFO)))  %*% RMi_R )
-    } else {
-      RMi_R <-  tau[1]*RMi %*% diag(N) %*% R %*% diag(sqrt(INFO))
-      tR_RMi_R <-  tau[1]*( t( diag(N) %*% R %*% diag(sqrt(INFO))) %*% RMi_R )
-    }
-    z_RMi_R <- t(z %*% RMi_R)
-    I_tR_RMi_R <- diag(1, p) + tR_RMi_R
-  } else {
-    z_RMi_R <- supplied_matrices[[1]]
-    I_tR_RMi_R <- supplied_matrices[[2]]
-  }
-
 
   # Comparison LD matrix. If a configuration has two SNPs with correlation
   #   above a threshold, then it is ignored.
@@ -226,7 +265,8 @@ FINEMAPMISS <- function(ses, betas, R, tau = 0.05, adj = 0.0001,
         # Here we evaluate the config if it does not contain highly correlated
         #   SNPs and is not the null config.
         #   The log prior is also added.
-        log_bf[kk] <- .eval_logbf(z_RMi_R = z_RMi_R, I_tR_RMi_R = I_tR_RMi_R, configuration = config) + log_prior[length(config) + 1]
+        log_bf[kk] <- .log_dmvnorm(x = z[config], S = RM[config,config] + tau^2*(Si_Ii[config,config] %*% R[config,config] %*% I2[config,config] %*% R[config, config] %*% Si_Ii[config,config])) -
+          .log_dmvnorm(x = z[config], S = RM[config, config]) + log_prior[length(config) + 1]
 
       }
     }
@@ -280,11 +320,11 @@ FINEMAPMISS <- function(ses, betas, R, tau = 0.05, adj = 0.0001,
 
 
   pips <- .calculate_pips(init_configs = init_configs,
-                         p = p,
-                         stored_init_config_sizes = stored_init_config_sizes,
-                         stored_log_bf = stored_log_bf,
-                         stored_unique_configs = stored_unique_configs,
-                         lse = lse)
+                          p = p,
+                          stored_init_config_sizes = stored_init_config_sizes,
+                          stored_log_bf = stored_log_bf,
+                          stored_unique_configs = stored_unique_configs,
+                          lse = lse)
 
 
   # Computing posterior probability for number of causal variants 'k'
@@ -297,26 +337,30 @@ FINEMAPMISS <- function(ses, betas, R, tau = 0.05, adj = 0.0001,
   # Evaluating credible sets
   if(cred_eval == T){
     print("Credible Sets")
-    cred <- .create_credible_sets(cred_sizes = cred_sizes,
-                                 post_k = post_k,
-                                 max_causals = max_causals,
-                                 stored_log_bf = stored_log_bf,
-                                 stored_config_sizes = stored_config_sizes,
-                                 stored_configs = stored_configs,
-                                 log_prior = log_prior,
-                                 z_RMi_R = z_RMi_R,
-                                 I_tR_RMi_R = I_tR_RMi_R,
-                                 comp_R = comp_R,
-                                 p = p)
+    cred <- .create_credible_sets_FM(cred_sizes = cred_sizes,
+                                  post_k = post_k,
+                                  max_causals = max_causals,
+                                  stored_log_bf = stored_log_bf,
+                                  stored_config_sizes = stored_config_sizes,
+                                  stored_configs = stored_configs,
+                                  log_prior = log_prior,
+                                  RM = RM,
+                                  comp_R = comp_R,
+                                  p = p,
+                                  Si_Ii = Si_Ii,
+                                  I2 = I2,
+                                  R = R,
+                                  z = z,
+                                  tau = tau)
   } else {
     cred <- NULL
   }
 
 
   # Returning grouped pips, individual pips, snp groups and stored_configs.
-    return(list("pips" = pips,
-                "stored_configs" = cbind(stored_configs, stored_log_bf, stored_config_sizes, stored_unique_configs),
-                "cred" = cred,
-                "post_k" = post_k))
+  return(list("pips" = pips,
+              "stored_configs" = cbind(stored_configs, stored_log_bf, stored_config_sizes, stored_unique_configs),
+              "cred" = cred,
+              "post_k" = post_k))
 }
 

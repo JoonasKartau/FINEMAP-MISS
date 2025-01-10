@@ -1,6 +1,6 @@
-#' FINEMAP-MISS credible sets
+#' FINEMAP credible sets
 #'
-#' Computes credible sets from the fine-mapping output of FINEMAP-MISS.
+#' Computes credible sets from the fine-mapping output of the FINEMAP model.
 #'
 #'
 #' @param cred_sizes Vector or numeric of size of credible sets to be created.
@@ -14,9 +14,13 @@
 #' evaluated during fine-mapping.
 #' @param stored_configs Vector of evaluated configurations, stored as a collapsed string.
 #' @param log_prior Natural log transformed prior for number of causal variants.
-#' @param z_RMi_R Pre-multiplied vector for fine-mapping.
-#' @param I_tR_RMi_R Pre-multiplied matrix for fine-mapping.
 #' @param comp_R LD matrix, with diagonal set to 0.
+#' @param RM z-score covariance matrix
+#' @param R LD matrix.
+#' @param Si_Ii Diagonal matrix of standard error and square root of INFO score inverses.
+#' @param I2 Diagonal matrix of INFO scores.
+#' @param z vector of z-scores.
+#' @param tau prior standard deviation.
 #' @param p Number of variants.
 #'
 #' @return List of credible sets as matrices for each 'cred_size' in 'cred_sizes'. If 'length(cred_sizes) == 1', then the
@@ -24,17 +28,21 @@
 #' @export
 #'
 #' @examples
-.create_credible_sets <- function(cred_sizes,
+.create_credible_sets_FM <- function(cred_sizes,
                                   post_k,
                                   max_causals,
                                   stored_log_bf,
                                   stored_config_sizes,
                                   stored_configs,
                                   log_prior,
-                                  z_RMi_R,
-                                  I_tR_RMi_R,
                                   comp_R,
-                                  p){
+                                  RM,
+                                  R,
+                                  p,
+                                  Si_Ii,
+                                  I2,
+                                  z,
+                                  tau){
   cred_list <- list()
   # If size of credible sets is not specified, expected posterior number of
   #   causal variants is used.
@@ -63,7 +71,8 @@
       if(cred_size == 1){
         non_cond_ind <- 1:p
         for(ii in 1:p){
-          log_abf[ii] <- .eval_logbf(z_RMi_R = z_RMi_R, I_tR_RMi_R = I_tR_RMi_R, configuration = ii) + log_prior[2]
+          log_abf[ii] <- .log_dmvnorm(x = z[ii], S = RM[ii,ii] + tau^2*(Si_Ii[ii,ii] %*% R[ii,ii] %*% I2[ii,ii] %*% R[ii,ii] %*% Si_Ii[ii,ii])) -
+            .log_dmvnorm(x = z[ii], S = RM[ii, ii]) + log_prior[2]
         }
         lse_abf <- logsumexp(log_abf)
         post <- sapply(1:p, function(x){
@@ -83,7 +92,8 @@
               log_abf[ii] <- -Inf
             } else {
               # Evaluating log_bfs
-              log_abf[ii] <- .eval_logbf(z_RMi_R = z_RMi_R, I_tR_RMi_R = I_tR_RMi_R, configuration = config) + log_prior[length(config) + 1]
+              log_abf[ii] <- .log_dmvnorm(x = z[config], S = RM[config,config] + tau^2*(Si_Ii[config,config] %*% R[config,config] %*% I2[config,config] %*% R[config, config] %*% Si_Ii[config,config])) -
+                .log_dmvnorm(x = z[config], S = RM[config, config]) + log_prior[length(config) + 1]
             }
           }
         }
