@@ -12,7 +12,6 @@
 #' @param non_causals Set of variants not in 'init_config'.
 #'
 #' @return Initial configuration for the next iteration of SSS.
-#' @export
 #'
 #' @examples
 .sample_new_config <- function(init_config,

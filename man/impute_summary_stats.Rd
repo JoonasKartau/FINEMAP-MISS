@@ -7,11 +7,11 @@
 impute_summary_stats(
   R,
   z,
-  typed,
-  untyped,
+  observed,
+  unobserved,
   shrink = 1e-04,
   return_z = TRUE,
-  scale = T,
+  scale = TRUE,
   n = NULL
 )
 }
@@ -20,9 +20,9 @@ impute_summary_stats(
 
 \item{z}{z-scores}
 
-\item{typed}{Index vector of observed variants}
+\item{observed}{Index vector of observed variants}
 
-\item{untyped}{Index vector of unobserved variants}
+\item{unobserved}{Index vector of unobserved variants}
 
 \item{shrink}{Shrinkage factor}
 
@@ -37,4 +37,48 @@ Matrix with columns: 1. Imputed z-scores (marginal effect if return_z == F), 2. 
 }
 \description{
 Impute summary statistics
+}
+\examples{
+#Loading toy data with one true causal variant.
+data("toydata_FINEMAPMISS")
+
+betas <- toydata_FINEMAPMISS$betas
+ses <- toydata_FINEMAPMISS$ses
+MAF <- toydata_FINEMAPMISS$MAF
+LD <- toydata_FINEMAPMISS$LD
+
+n <- toydata_FINEMAPMISS$study_sample_sizes
+p <- dim(LD)[1]
+
+#Simulating missingness in 20\% of variants (including the true causal variant)
+missing_data <- unique(sort(c(toydata_FINEMAPMISS$causal_snp,
+                              cbind(sample(1:p, round(p*0.2))))))
+
+#Which dataset are the variants missing from?
+which_dataset_missing <- sample(1:2, length(missing_data), replace = TRUE)
+
+#Setting missing data to 0 or Inf.
+betas[missing_data[which_dataset_missing == 1],1] <- 0
+ses[missing_data[which_dataset_missing == 1],1] <- Inf
+MAF[missing_data[which_dataset_missing == 1],1] <- 0
+
+#Setting variants sample sizes
+variant_sample_sizes <- rep(sum(n), p)
+variant_sample_sizes[missing_data] <- n[1]
+
+#Index of observed variants from study1
+obs <- setdiff(1:p, missing_data[which_dataset_missing == 1])
+
+#Index of unobserved variants from study 1
+unobs <- sort(missing_data[which_dataset_missing == 1])
+
+#z-scores from study 1
+z_obs <- (betas/ses)[obs, 1]
+
+imputation <- impute_summary_stats(R = LD, z = z_obs,
+                                    observed = obs,
+                                    unobserved = unobs, n = n,
+                                    return_z = FALSE, scale = TRUE)
+
+
 }

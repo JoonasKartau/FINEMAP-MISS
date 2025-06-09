@@ -7,8 +7,9 @@
 .create_RM_matrix(
   ses,
   betas = NULL,
+  INFO,
   R,
-  beta_shrink = FALSE,
+  beta_shrink = T,
   n_studies,
   p,
   estimate_M = FALSE,
@@ -23,6 +24,12 @@ the standard errors for one dataset. For any unobserved variants in a study,
 the standard errors should be set to Inf.}
 
 \item{betas}{A vector or matrix of GWAS marginal effects.
+Takes the form of a vector if there is only a single dataset or the data has
+been combined in advance. Otherwise, it is a matrix where each column contains
+the marginal effects for one dataset. For any unobserved variants in a study,
+the marginal effects should be set to 0.}
+
+\item{INFO}{A vector or matrix of variant imputation scores.
 Takes the form of a vector if there is only a single dataset or the data has
 been combined in advance. Otherwise, it is a matrix where each column contains
 the marginal effects for one dataset. For any unobserved variants in a study,

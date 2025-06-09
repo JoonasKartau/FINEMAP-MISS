@@ -29,8 +29,6 @@
 #' @param quiet Should the current progress of SSS be repressed?
 #' @param RM If \eqn{\boldsymbol{R_M}} has been computed in advance, it can be provided as input.
 #' @param estimate_M Should \eqn{\boldsymbol{M}} be estimated? This should be used if data has been meta-analyzed in advance.
-#' @param beta_shrink Should beta shrinkage in the
-#' marginal effect covariances be applied?
 #' @param n_studies Number of studies. Should be equal to the number of columns in
 #' ses abnd betas. If the data has been combined in advance, set to \code{1}.
 #' @param variant_sample_sizes Vector of combined sample sizes per variant, from the meta-analysis.
@@ -59,22 +57,109 @@
 #' @export
 #'
 #' @examples
+#'#Running FINEMAP with imputedd summary statistics
+#'
+#'#Loading toy data with one true causal variant.
+#'data("toydata_FINEMAPMISS")
+#'
+#'betas <- toydata_FINEMAPMISS$betas
+#'ses <- toydata_FINEMAPMISS$ses
+#'MAF <- toydata_FINEMAPMISS$MAF
+#'LD <- toydata_FINEMAPMISS$LD
+#'
+#'n <- toydata_FINEMAPMISS$study_sample_sizes
+#'p <- dim(LD)[1]
+#'
+#'#Simulating missingness in 20% of variants (including the true causal variant)
+#'missing_data <- unique(sort(c(toydata_FINEMAPMISS$causal_snp,
+#'                               cbind(sample(1:p, round(p*0.2))))))
+#'
+#'#Which dataset are the variants missing from?
+#'which_dataset_missing <- sample(1:2, length(missing_data), replace = TRUE)
+#'
+#'#Setting missing data to 0 or Inf.
+#'betas[missing_data[which_dataset_missing == 1],1] <- 0
+#'betas[missing_data[which_dataset_missing == 2],2] <- 0
+#'ses[missing_data[which_dataset_missing == 1],1] <- Inf
+#'ses[missing_data[which_dataset_missing == 2],2] <- Inf
+#'MAF[missing_data[which_dataset_missing == 1],1] <- 0
+#'MAF[missing_data[which_dataset_missing == 2],2] <- 0
+#'
+#'#Setting variants sample sizes
+#'variant_sample_sizes <- rep(sum(n), p)
+#'variant_sample_sizes[missing_data] <- n[1]
+#'
+#'#Index of observed variants from each study
+#'obs1 <- setdiff(1:p, missing_data[which_dataset_missing == 1])
+#'obs2 <- setdiff(1:p, missing_data[which_dataset_missing == 2])
+#'
+#'#'#Index of unobserved variants from each study
+#'unobs1 <- sort(missing_data[which_dataset_missing == 1])
+#'unobs2 <- sort(missing_data[which_dataset_missing == 2])
+#'
+#'#z-scores from each study
+#'z_obs1 <- (betas/ses)[obs1, 1]
+#'z_obs2 <- (betas/ses)[obs2, 2]
+#'
+#'imputation1 <- impute_summary_stats(R = LD, z = z_obs1,
+#'                                     observed = obs1,
+#'                                     unobserved = unobs1, n = n,
+#'                                     return_z = FALSE, scale = TRUE)
+#'
+#'
+#'imputation2 <- impute_summary_stats(R = LD, z = z_obs2,
+#'                                    observed = obs2,
+#'                                    unobserved = unobs2, n = n,
+#'                                    return_z = FALSE, scale = TRUE)
+#'
+#'#Copying over summary statistics
+#'betas_imputed <- betas
+#'ses_imputed <- ses
+#'
+#'#Using imputed values to replace missing observations
+#'betas_imputed[unobs1,1] <- imputation1[,1]
+#'ses_imputed[unobs1,1] <- imputation1[,3]
+#'
+#'betas_imputed[unobs2,2] <- imputation2[,1]
+#'ses_imputed[unobs2,2] <- imputation2[,3]
+#'
+#'#Assuming all variants fully observed after imputation
+#'variant_sample_sizes <- rep(sum(n),p)
+#'
+#'#Running FINEMAP
+#'output_FM <- original_FINEMAP(ses = ses,
+#'                          betas = betas,
+#'                          R = LD,
+#'                          n_studies = 2,
+#'                          variant_sample_sizes = variant_sample_sizes,
+#'                          freqs = MAF)
+#'
+#'
 original_FINEMAP <- function(ses, betas, R, tau = 0.05,
                         n_reps = 50,
                         prob_threshold = 0.001, max_causals = 5,
                         cred_sizes = NULL, cred_eval = T, meta_analyze = T,
                         quiet = T,
                         RM = NULL,
-                        estimate_M = FALSE,
-                        beta_shrink = TRUE, n_studies,
+                        estimate_M = FALSE, n_studies,
                         variant_sample_sizes = NULL,
                         max_overlap = T, freqs,
                         scaled_data = F, use_N = F, INFO = NULL,
                         cholesky = T){
-  # Checking for suitable input.
+
+  #Changing input into matrix form.
+  p <- dim(ses)[1]
+
   ses <- as.matrix(ses)
   betas <- as.matrix(betas)
+  freqs <- as.matrix(freqs)
+  if(is.null(INFO)){
+    INFO <- matrix(1, nrow = p, ncol = n_studies)
+  } else {
+    INFO <- as.matrix(INFO)
+  }
 
+  # Checking for suitable input.
   if(!all(dim(ses) == dim(betas)) | !all(dim(ses) == dim(freqs))){
     stop("Error: dimensions of ses, betas, and freqs must be equal.")
   }
@@ -139,6 +224,10 @@ original_FINEMAP <- function(ses, betas, R, tau = 0.05,
     }
   }
 
+  if(estimate_M == T & n_studies > 1){
+    stop("Error: estimate_M can only be used if n_studies == 1")
+  }
+
   #Scaling data
   if(scaled_data == F){
     betas <- betas*sqrt(2*freqs*(1-freqs))
@@ -153,35 +242,37 @@ original_FINEMAP <- function(ses, betas, R, tau = 0.05,
     se_meta <- meta_analysis[[2]]
 
     INFO_meta <- IVW(betas = INFO, ses = ses)[[1]]
+
+
   } else {
     beta_meta <- betas
     se_meta <- ses
+    if(is.null(INFO)){
+      INFO_meta <- rep(1,p)
+    } else {
+      INFO_meta <- INFO
+    }
   }
   z <- beta_meta/se_meta
 
   # Creating sample size overlap matrix M
-  p <- length(beta_meta)
-  if(is.null(INFO)){
+
+
+  if(use_N == T){
+    se_meta <- sqrt((1 - INFO_meta*beta_meta^2)/variant_sample_sizes)
     INFO_meta <- rep(1,p)
   }
-
 
   I2 <- diag(INFO_meta)
-  if(use_N == T){
-    se_meta <- sqrt((1 - beta_meta^2)/variant_sample_sizes)
-    INFO_meta <- rep(1,p)
-  }
-
-
   Si_Ii <- diag(1/se_meta/sqrt(INFO_meta))
 
 
   print("Creating sample overlap matrix")
 
   if(is.null(RM)){
-    RM <- .create_RM_matrix(ses = ses, betas = betas, R = R, beta_shrink = beta_shrink,
+    RM <- .create_RM_matrix(ses = ses, betas = betas, R = R,
                             n_studies = n_studies, estimate_M = estimate_M, p = p,
-                            max_overlap = max_overlap)
+                            max_overlap = max_overlap, INFO = INFO)
   }
 
   # Comparison LD matrix. If a configuration has two SNPs with correlation

@@ -18,7 +18,6 @@ original_FINEMAP(
   quiet = T,
   RM = NULL,
   estimate_M = FALSE,
-  beta_shrink = TRUE,
   n_studies,
   variant_sample_sizes = NULL,
   max_overlap = T,
@@ -66,9 +65,6 @@ combined in advance, should be set to \code{FALSE}.}
 
 \item{estimate_M}{Should \eqn{\boldsymbol{M}} be estimated? This should be used if data has been meta-analyzed in advance.}
 
-\item{beta_shrink}{Should beta shrinkage in the
-marginal effect covariances be applied?}
-
 \item{n_studies}{Number of studies. Should be equal to the number of columns in
 ses abnd betas. If the data has been combined in advance, set to \code{1}.}
 
@@ -108,4 +104,84 @@ variants and a phenotype, using marginal effect estimates \eqn{\boldsymbol{\wide
  their standard errors \eqn{\boldsymbol{s}}, and  a reference LD panel \eqn{\boldsymbol{R}}
  as input. This is a recreation of the C++ implementation by Christian Benner and Matti Pirinen.
  Not recommended for meta-analyzed GWAS data.
+}
+\examples{
+#Running FINEMAP with imputedd summary statistics
+
+#Loading toy data with one true causal variant.
+data("toydata_FINEMAPMISS")
+
+betas <- toydata_FINEMAPMISS$betas
+ses <- toydata_FINEMAPMISS$ses
+MAF <- toydata_FINEMAPMISS$MAF
+LD <- toydata_FINEMAPMISS$LD
+
+n <- toydata_FINEMAPMISS$study_sample_sizes
+p <- dim(LD)[1]
+
+#Simulating missingness in 20\% of variants (including the true causal variant)
+missing_data <- unique(sort(c(toydata_FINEMAPMISS$causal_snp,
+                              cbind(sample(1:p, round(p*0.2))))))
+
+#Which dataset are the variants missing from?
+which_dataset_missing <- sample(1:2, length(missing_data), replace = TRUE)
+
+#Setting missing data to 0 or Inf.
+betas[missing_data[which_dataset_missing == 1],1] <- 0
+betas[missing_data[which_dataset_missing == 2],2] <- 0
+ses[missing_data[which_dataset_missing == 1],1] <- Inf
+ses[missing_data[which_dataset_missing == 2],2] <- Inf
+MAF[missing_data[which_dataset_missing == 1],1] <- 0
+MAF[missing_data[which_dataset_missing == 2],2] <- 0
+
+#Setting variants sample sizes
+variant_sample_sizes <- rep(sum(n), p)
+variant_sample_sizes[missing_data] <- n[1]
+
+#Index of observed variants from each study
+obs1 <- setdiff(1:p, missing_data[which_dataset_missing == 1])
+obs2 <- setdiff(1:p, missing_data[which_dataset_missing == 2])
+
+#'#Index of unobserved variants from each study
+unobs1 <- sort(missing_data[which_dataset_missing == 1])
+unobs2 <- sort(missing_data[which_dataset_missing == 2])
+
+#z-scores from each study
+z_obs1 <- (betas/ses)[obs1, 1]
+z_obs2 <- (betas/ses)[obs2, 2]
+
+imputation1 <- impute_summary_stats(R = LD, z = z_obs1,
+                                    observed = obs1,
+                                    unobserved = unobs1, n = n,
+                                    return_z = FALSE, scale = TRUE)
+
+
+imputation2 <- impute_summary_stats(R = LD, z = z_obs2,
+                                   observed = obs2,
+                                   unobserved = unobs2, n = n,
+                                   return_z = FALSE, scale = TRUE)
+
+#Copying over summary statistics
+betas_imputed <- betas
+ses_imputed <- ses
+
+#Using imputed values to replace missing observations
+betas_imputed[unobs1,1] <- imputation1[,1]
+ses_imputed[unobs1,1] <- imputation1[,3]
+
+betas_imputed[unobs2,2] <- imputation2[,1]
+ses_imputed[unobs2,2] <- imputation2[,3]
+
+#Assuming all variants fully observed after imputation
+variant_sample_sizes <- rep(sum(n),p)
+
+#Running FINEMAP
+output_FM <- original_FINEMAP(ses = ses,
+                         betas = betas,
+                         R = LD,
+                         n_studies = 2,
+                         variant_sample_sizes = variant_sample_sizes,
+                         freqs = MAF)
+
+
 }

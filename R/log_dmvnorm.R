@@ -8,7 +8,6 @@
 #' @param cholesky is cholesky decomposition used for inversion? If not base R solve is used.
 #'
 #' @return log-density of the observed point x.
-#' @export
 #'
 #' @examples
 .log_dmvnorm <- function(x,

@@ -13,7 +13,6 @@
 #' @param lse logsumexp of evaluated configuration log Bayes-factors
 #'
 #' @return Numeric vector of PIPs for each variant.
-#' @export
 #'
 #' @examples
 .calculate_pips <- function(init_configs,
@@ -26,10 +25,6 @@
 
   # Loop for each SNP to compute its pip.
   for(snp in 1:p){
-    # Updater
-    if(snp %% 100 == 0){
-      print(snp)
-    }
 
     # Integer tallying our current position in the stored_configs matrix.
     sum_configs <- 0

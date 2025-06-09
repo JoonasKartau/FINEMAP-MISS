@@ -8,43 +8,57 @@ FINEMAPMISS(
   ses,
   betas,
   R,
+  n_studies,
+  variant_sample_sizes = NULL,
+  freqs,
+  INFO = NULL,
   tau = 0.05,
   adj = 1e-04,
   n_reps = 50,
   prob_threshold = 0.001,
   max_causals = 5,
   cred_sizes = NULL,
-  cred_eval,
-  meta_analyze = T,
-  quiet = T,
-  supplied_matrices = NULL,
+  quiet = F,
   adj_match = T,
   RM = NULL,
   estimate_M = FALSE,
-  beta_shrink = TRUE,
-  n_studies,
-  variant_sample_sizes = NULL,
   max_overlap = T,
-  freqs,
   scaled_data = F,
-  use_N = F,
-  INFO = NULL
+  use_N = T,
+  INFO_prior = T
 )
 }
 \arguments{
-\item{ses}{A vector or matrix of GWAS marginal effect standard errors.
+\item{ses}{A vector or matrix of GWAS marginal effect standard errors \eqn{\boldsymbol{s}}.
 Takes the form of a vector if there is only a single dataset or the data has
 been combined in advance. Otherwise, it is a matrix where each column contains
 the standard errors for one dataset. For any unobserved variants in a study,
 the standard errors should be set to \code{Inf}.}
 
-\item{betas}{A vector or matrix of GWAS marginal effects.
+\item{betas}{A vector or matrix of GWAS marginal effects \eqn{\boldsymbol{\widehat \beta}}.
 Takes the form of a vector if there is only a single dataset or the data has
 been combined in advance. Otherwise, it is a matrix where each column contains
 the marginal effects for one dataset. For any unobserved variants in a study,
 the marginal effects should be set to \code{0}.}
 
-\item{R}{Reference LD matrix for the set of analyzed variants.}
+\item{R}{Reference LD matrix \eqn{\boldsymbol{R}} for the set of analyzed variants.}
+
+\item{n_studies}{Number of studies. Should be equal to the number of columns in
+ses abnd betas. If the data has been combined in advance, set to \code{1}.}
+
+\item{variant_sample_sizes}{Vector of combined sample sizes per variant, from the meta-analysis.}
+
+\item{freqs}{A vector or matrix of variant frequencies.
+Takes the form of a vector if there is only a single dataset or the data has
+been combined in advance. Otherwise, it is a matrix where each column contains
+the variant frequencies for one dataset. For any unobserved variants in a study,
+the marginal effects should be set to \code{0}.}
+
+\item{INFO}{A vector or matrix of variant INFO scores.
+Takes the form of a vector if there is only a single dataset or the data has
+been combined in advance. Otherwise, it is a matrix where each column contains
+the INFO scores for one dataset. For any unobserved variants in a study,
+the marginal effects should be set to \code{0}.}
 
 \item{tau}{Prior standard error for the casual effects. Set by default to \code{0.05}.}
 
@@ -60,17 +74,7 @@ the marginal effects should be set to \code{0}.}
 \item{cred_sizes}{Vector or numeric of size of credible sets to be evaluated. If no value
 is provided, the rounded expected posterior for number of causal variants is used.}
 
-\item{cred_eval}{Binary variable, should credible sets be computed?}
-
-\item{meta_analyze}{Binary variable, should the data be meta-analyzed?
-If input data (\code{ses, betas, freqs, INFO}) is in the form of a matrix, then
-\code{meta_analyze} needs to be set to \code{TRUE}.}
-
 \item{quiet}{Should the current progress of SSS be repressed?}
-
-\item{supplied_matrices}{If the vector \eqn{\boldsymbol{\widehat z}^{T} \boldsymbol{R_M}^{-1}\boldsymbol{R}_{\boldsymbol{\gamma}} }
-and matrix \eqn{\mathbb{I}_p + \boldsymbol{R}_{\boldsymbol{\gamma}}^{T} \boldsymbol{R_M}^{-1} \boldsymbol{R}_{\boldsymbol{\gamma}} }
-have been computed in advance, they can be input as a list to avoid computing them again.}
 
 \item{adj_match}{Should the \eqn{\boldsymbol{R}} be adjusted in a similar way to \eqn{\boldsymbol{R_M}} when computing log Bayes-factors?}
 
@@ -78,33 +82,15 @@ have been computed in advance, they can be input as a list to avoid computing th
 
 \item{estimate_M}{Should \eqn{\boldsymbol{M}} be estimated? This should be used if data has been meta-analyzed in advance.}
 
-\item{beta_shrink}{Should beta shrinkage in the
-marginal effect covariances be applied?}
-
-\item{n_studies}{Number of studies. Should be equal to the number of columns in
-ses abnd betas. If the data has been combined in advance, set to \code{1}.}
-
-\item{variant_sample_sizes}{Vector of combined sample sizes per variant, from the meta-analysis.}
-
 \item{max_overlap}{Binary parameter denoting whether the maximum sample
 overlap is assumed when estimating \eqn{\boldsymbol{M}}.}
 
-\item{freqs}{A vector or matrix of variant frequencies.
-Takes the form of a vector if there is only a single dataset or the data has
-been combined in advance. Otherwise, it is a matrix where each column contains
-the variant frequencies for one dataset. For any unobserved variants in a study,
-the marginal effects should be set to \code{0}.}
-
 \item{scaled_data}{Has the data been scaled with allele frequencies in advance?}
 
-\item{use_N}{Are the variant sample sizes or marginal effect standard errors used
-for fine-mapping?}
+\item{use_N}{Should the variant sample sizes be used for fine-mapping, instead of the
+GWAS standard errors? (experimental)}
 
-\item{INFO}{A vector or matrix of variant INFO scores.
-Takes the form of a vector if there is only a single dataset or the data has
-been combined in advance. Otherwise, it is a matrix where each column contains
-the INFO scores for one dataset. For any unobserved variants in a study,
-the marginal effects should be set to \code{0}.}
+\item{INFO_prior}{Should the INFO scores be used to scale the prior? (experimental)}
 }
 \value{
 A list of objects
@@ -127,4 +113,45 @@ variants and a phenotype, using marginal effect estimates \eqn{\boldsymbol{\wide
  and fine-map the data. \cr
  If the data have been combined into a single dataset in advance, \code{FINEMAPMISS}
  can still be run, but with reduced accuracy.
+}
+\examples{
+#Loading toy data with one true causal variant.
+data("toydata_FINEMAPMISS")
+
+betas <- toydata_FINEMAPMISS$betas
+ses <- toydata_FINEMAPMISS$ses
+MAF <- toydata_FINEMAPMISS$MAF
+LD <- toydata_FINEMAPMISS$LD
+
+n <- toydata_FINEMAPMISS$study_sample_sizes
+p <- dim(LD)[1]
+
+#Simulating missingness in 20\% of variants (including the true causal variant)
+missing_data <- unique(sort(c(toydata_FINEMAPMISS$causal_snp,
+                              cbind(sample(1:p, round(p*0.2))))))
+
+#Which dataset are the variants missing from?
+which_dataset_missing <- sample(1:2, length(missing_data), replace = TRUE)
+
+#Setting missing data to 0 or Inf.
+betas[missing_data[which_dataset_missing == 1],1] <- 0
+betas[missing_data[which_dataset_missing == 2],2] <- 0
+ses[missing_data[which_dataset_missing == 1],1] <- Inf
+ses[missing_data[which_dataset_missing == 2],2] <- Inf
+MAF[missing_data[which_dataset_missing == 1],1] <- 0
+MAF[missing_data[which_dataset_missing == 2],2] <- 0
+
+#Setting variants sample sizes
+variant_sample_sizes <- rep(sum(n), p)
+variant_sample_sizes[missing_data] <- n[1]
+
+#Running FINEMAPMISS
+output_FMM <- FINEMAPMISS(ses = ses,
+                         betas = betas,
+                         R = LD,
+                         n_studies = 2,
+                         variant_sample_sizes = variant_sample_sizes,
+                         freqs = MAF)
+
+
 }

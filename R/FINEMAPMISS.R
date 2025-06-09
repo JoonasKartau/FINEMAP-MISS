@@ -11,12 +11,12 @@
 #'  If the data have been combined into a single dataset in advance, \code{FINEMAPMISS}
 #'  can still be run, but with reduced accuracy.
 #'
-#' @param ses A vector or matrix of GWAS marginal effect standard errors.
+#' @param ses A vector or matrix of GWAS marginal effect standard errors \eqn{\boldsymbol{s}}.
 #' Takes the form of a vector if there is only a single dataset or the data has
 #' been combined in advance. Otherwise, it is a matrix where each column contains
 #' the standard errors for one dataset. For any unobserved variants in a study,
 #' the standard errors should be set to \code{Inf}.
-#' @param betas A vector or matrix of GWAS marginal effects.
+#' @param betas A vector or matrix of GWAS marginal effects \eqn{\boldsymbol{\widehat \beta}}.
 #' Takes the form of a vector if there is only a single dataset or the data has
 #' been combined in advance. Otherwise, it is a matrix where each column contains
 #' the marginal effects for one dataset. For any unobserved variants in a study,
@@ -26,7 +26,7 @@
 #' been combined in advance. Otherwise, it is a matrix where each column contains
 #' the INFO scores for one dataset. For any unobserved variants in a study,
 #' the marginal effects should be set to \code{0}.
-#' @param R Reference LD matrix for the set of analyzed variants.
+#' @param R Reference LD matrix \eqn{\boldsymbol{R}} for the set of analyzed variants.
 #' @param tau Prior standard error for the casual effects. Set by default to \code{0.05}.
 #' @param adj Adjustment constant \eqn{\varepsilon}, shrinks the correlations in
 #'  \eqn{\boldsymbol{R_M}} to make its inversion stable.
@@ -35,19 +35,10 @@
 #' @param max_causals Maximum number of causal variants.
 #' @param cred_sizes Vector or numeric of size of credible sets to be evaluated. If no value
 #' is provided, the rounded expected posterior for number of causal variants is used.
-#' @param cred_eval Binary variable, should credible sets be computed?
-#' @param meta_analyze Binary variable, should the data be meta-analyzed?
-#' If input data (\code{ses, betas, freqs, INFO}) is in the form of a matrix, then
-#' \code{meta_analyze} needs to be set to \code{TRUE}.
 #' @param quiet Should the current progress of SSS be repressed?
-#' @param supplied_matrices If the vector \eqn{\boldsymbol{\widehat z}^{T} \boldsymbol{R_M}^{-1}\boldsymbol{R}_{\boldsymbol{\gamma}} }
-#' and matrix \eqn{\mathbb{I}_p + \boldsymbol{R}_{\boldsymbol{\gamma}}^{T} \boldsymbol{R_M}^{-1} \boldsymbol{R}_{\boldsymbol{\gamma}} }
-#' have been computed in advance, they can be input as a list to avoid computing them again.
 #' @param adj_match Should the \eqn{\boldsymbol{R}} be adjusted in a similar way to \eqn{\boldsymbol{R_M}} when computing log Bayes-factors?
 #' @param RM If \eqn{\boldsymbol{R_M}} has been computed in advance, it can be provided as input.
 #' @param estimate_M Should \eqn{\boldsymbol{M}} be estimated? This should be used if data has been meta-analyzed in advance.
-#' @param beta_shrink Should beta shrinkage in the
-#' marginal effect covariances be applied?
 #' @param n_studies Number of studies. Should be equal to the number of columns in
 #' ses abnd betas. If the data has been combined in advance, set to \code{1}.
 #' @param variant_sample_sizes Vector of combined sample sizes per variant, from the meta-analysis.
@@ -59,8 +50,9 @@
 #' the variant frequencies for one dataset. For any unobserved variants in a study,
 #' the marginal effects should be set to \code{0}.
 #' @param scaled_data Has the data been scaled with allele frequencies in advance?
-#' @param use_N Are the variant sample sizes or marginal effect standard errors used
-#' for fine-mapping?
+#' @param use_N Should the variant sample sizes be used for fine-mapping, instead of the
+#' GWAS standard errors? (experimental)
+#' @param INFO_prior Should the INFO scores be used to scale the prior? (experimental)
 #'
 #' @return A list of objects
 #' \describe{
@@ -74,26 +66,96 @@
 #' @export
 #'
 #' @examples
-FINEMAPMISS <- function(ses, betas, R, tau = 0.05, adj = 0.0001,
+#'#Loading toy data with one true causal variant.
+#'data("toydata_FINEMAPMISS")
+#'
+#'betas <- toydata_FINEMAPMISS$betas
+#'ses <- toydata_FINEMAPMISS$ses
+#'MAF <- toydata_FINEMAPMISS$MAF
+#'LD <- toydata_FINEMAPMISS$LD
+#'
+#'n <- toydata_FINEMAPMISS$study_sample_sizes
+#'p <- dim(LD)[1]
+#'
+#'#Simulating missingness in 20% of variants (including the true causal variant)
+#'missing_data <- unique(sort(c(toydata_FINEMAPMISS$causal_snp,
+#'                               cbind(sample(1:p, round(p*0.2))))))
+#'
+#'#Which dataset are the variants missing from?
+#'which_dataset_missing <- sample(1:2, length(missing_data), replace = TRUE)
+#'
+#'#Setting missing data to 0 or Inf.
+#'betas[missing_data[which_dataset_missing == 1],1] <- 0
+#'betas[missing_data[which_dataset_missing == 2],2] <- 0
+#'ses[missing_data[which_dataset_missing == 1],1] <- Inf
+#'ses[missing_data[which_dataset_missing == 2],2] <- Inf
+#'MAF[missing_data[which_dataset_missing == 1],1] <- 0
+#'MAF[missing_data[which_dataset_missing == 2],2] <- 0
+#'
+#'#Setting variants sample sizes
+#'variant_sample_sizes <- rep(sum(n), p)
+#'variant_sample_sizes[missing_data] <- n[1]
+#'
+#'#Running FINEMAPMISS
+#'output_FMM <- FINEMAPMISS(ses = ses,
+#'                          betas = betas,
+#'                          R = LD,
+#'                          n_studies = 2,
+#'                          variant_sample_sizes = variant_sample_sizes,
+#'                          freqs = MAF)
+#'
+#'
+FINEMAPMISS <- function(ses, betas, R, n_studies, variant_sample_sizes = NULL,
+                        freqs, INFO = NULL,
+                        tau = 0.05, adj = 0.0001,
                              n_reps = 50,
                              prob_threshold = 0.001, max_causals = 5,
-                             cred_sizes = NULL, cred_eval, meta_analyze = T,
-                             quiet = T, supplied_matrices = NULL, adj_match = T,
+                             cred_sizes = NULL,
+                             quiet = F, adj_match = T,
                              RM = NULL,
                              estimate_M = FALSE,
-                             beta_shrink = TRUE, n_studies,
-                             variant_sample_sizes = NULL,
-                             max_overlap = T, freqs,
-                             scaled_data = F, use_N = F, INFO = NULL){
+                             max_overlap = T,
+                             scaled_data = F, use_N = T,
+                             INFO_prior = T){
 
 
-  # Checking for suitable input.
+  #Changing input into matrix form.
+
   ses <- as.matrix(ses)
   betas <- as.matrix(betas)
+  freqs <- as.matrix(freqs)
 
-  if(!all(dim(ses) == dim(betas)) | !all(dim(ses) == dim(freqs))){
-    stop("Error: dimensions of ses, betas, and freqs must be equal.")
+  if(dim(ses)[2] > 1){
+    meta_analyze <- T
+  } else {
+    meta_analyze <- F
   }
+
+  p <- dim(ses)[1]
+
+  if(!is.null(INFO)){
+    if(!is.numeric(INFO)){
+      stop("Error: non-numeric input for INFO")
+    }
+  }
+
+  if(is.null(INFO)){
+    INFO <- matrix(1, nrow = p, ncol = n_studies)
+  } else {
+    INFO <- as.matrix(INFO)
+  }
+
+  # Checking for suitable input.
+  if(is.null(INFO)){
+    if(!all(dim(ses) == dim(betas)) | !all(dim(ses) == dim(freqs)) | !all(dim(ses) == dim(freqs))){
+      stop("Error: dimensions of ses, betas, and freqs must be equal.")
+    }
+  } else {
+    if(!all(dim(ses) == dim(betas)) | !all(dim(ses) == dim(freqs)) | !all(dim(ses) == dim(freqs))| !all(dim(ses) == dim(INFO))){
+      stop("Error: dimensions of ses, betas, freqs, and INFO must be equal.")
+    }
+  }
+
   if(!is.numeric(n_studies)){
     stop("Error: non-numeric input for n_studies")
   }
@@ -147,6 +209,8 @@ FINEMAPMISS <- function(ses, betas, R, tau = 0.05, adj = 0.0001,
   if(!is.numeric(prob_threshold)){
     stop("Error: non-numeric input for prob_threshold")
   }
+
+
   if(!is.null(cred_sizes)){
     if(!is.numeric(cred_sizes)){
       stop("Error: non-numeric input for cred_sizes")
@@ -156,6 +220,10 @@ FINEMAPMISS <- function(ses, betas, R, tau = 0.05, adj = 0.0001,
     if(!is.numeric(variant_sample_sizes)){
       stop("Error: non-numeric input for variant_sample_sizes")
     }
+  }
+
+  if(estimate_M == T & n_studies > 1){
+    stop("Error: estimate_M can only be used if n_studies == 1")
   }
 
 
@@ -174,57 +242,69 @@ FINEMAPMISS <- function(ses, betas, R, tau = 0.05, adj = 0.0001,
     se_meta <- meta_analysis[[2]]
 
     INFO_meta <- IVW(betas = INFO, ses = ses)[[1]]
+
+
   } else {
     beta_meta <- betas
     se_meta <- ses
+    if(is.null(INFO)){
+      INFO_meta <- rep(1,p)
+    } else {
+      INFO_meta <- INFO
+    }
   }
-
 
   # Creating sample size overlap matrix M
-  p <- length(beta_meta)
-  if(is.null(INFO)){
-    INFO_meta <- rep(1,p)
-  }
+
+
+
+
 
   print("Creating sample overlap matrix")
 
   if(is.null(RM)){
-    RM <- .create_RM_matrix(ses = ses, betas = betas, R = R, beta_shrink = beta_shrink,
+
+
+    RM <- .create_RM_matrix(ses = ses, betas = betas, INFO = INFO, R = R,
                    n_studies = n_studies, estimate_M = estimate_M, p = p,
                    max_overlap = max_overlap)
   }
 
   # Inverting RM with a diagonal adjustment.
   print("Inverting covariance matrix")
-  if(is.null(supplied_matrices)){
     RMi <- solve((RM*(1 - adj) + diag(adj, p)))
     # Making the prior variance of a causal variant a vector of length p.
     tau_vec <- rep(tau[1], p)/se_meta
-    z <- beta_meta/se_meta
+    z <- as.vector(beta_meta/se_meta)
 
     # Pre-multiplying matrices. We compute these only once and use specific
     #   cols and rows as needed, instead of computing them individually
     #   for each computation.
     print("Pre-multiplication matrices for fine-mapping")
+    if(INFO_prior == F){
+      INFO_meta <- rep(1, p)
+    }
 
     if(use_N == T){
-      N <- sqrt(variant_sample_sizes/(1 - beta_meta^2))
+      N <- as.vector(sqrt(variant_sample_sizes/(1 - INFO_meta*beta_meta^2)))
     } else {
-      N <- 1/se_meta/sqrt(INFO_meta)
+      N <- as.vector(1/se_meta/sqrt(INFO_meta))
     }
-    if("adj_match" == T){
-      RMi_R <-  tau[1]*RMi %*%  diag(N) %*% (R*(1 - adj) + diag(adj,p)) %*% diag(sqrt(INFO_meta))
-      tR_RMi_R <-  tau[1]*( t(diag(N) %*% (R*(1 - adj) + diag(adj,p)) %*% diag(sqrt(INFO_meta)))  %*% RMi_R )
+
+
+    INFO_meta <- as.vector(INFO_meta)
+    if(adj_match == T){
+      # RMi_R <-  tau[1]*RMi %*%  diag(N) %*% (R*(1 - adj) + diag(adj,p)) %*% diag(sqrt(INFO_meta))
+      # tR_RMi_R <-  tau[1]*( t(diag(N) %*% (R*(1 - adj) + diag(adj,p)) %*% diag(sqrt(INFO_meta)))  %*% RMi_R )
+      RMi_R <- RMi %*%  (N*t((R*(1 - adj) + diag(adj,p))*sqrt(INFO_meta)))
+      tR_RMi_R <- ( t(N*t((R*(1 - adj) + diag(adj,p))*sqrt(INFO_meta)))  %*% RMi_R )
     } else {
-      RMi_R <-  tau[1]*RMi %*% diag(N) %*% R %*% diag(sqrt(INFO_meta))
-      tR_RMi_R <-  tau[1]*( t( diag(N) %*% R %*% diag(sqrt(INFO_meta))) %*% RMi_R )
+      RMi_R <- RMi %*%  (N*t(R*sqrt(INFO_meta)))
+      tR_RMi_R <- ( t(N*t(R*sqrt(INFO_meta)))  %*% RMi_R )
     }
     z_RMi_R <- t(z %*% RMi_R)
     I_tR_RMi_R <- diag(1, p) + tR_RMi_R
-  } else {
-    z_RMi_R <- supplied_matrices[[1]]
-    I_tR_RMi_R <- supplied_matrices[[2]]
-  }
+
 
 
   # Comparison LD matrix. If a configuration has two SNPs with correlation
@@ -377,7 +457,7 @@ FINEMAPMISS <- function(ses, betas, R, tau = 0.05, adj = 0.0001,
   }
 
   # Evaluating credible sets
-  if(cred_eval == T){
+
     print("Credible Sets")
     cred <- .create_credible_sets(cred_sizes = cred_sizes,
                                  post_k = post_k,
@@ -390,15 +470,16 @@ FINEMAPMISS <- function(ses, betas, R, tau = 0.05, adj = 0.0001,
                                  I_tR_RMi_R = I_tR_RMi_R,
                                  comp_R = comp_R,
                                  p = p)
-  } else {
-    cred <- NULL
-  }
+
 
 
   # Returning grouped pips, individual pips, snp groups and stored_configs.
+
     return(list("pips" = pips,
                 "stored_configs" = cbind(stored_configs, stored_log_bf, stored_config_sizes, stored_unique_configs),
                 "cred" = cred,
                 "post_k" = post_k))
+
+
 }
 

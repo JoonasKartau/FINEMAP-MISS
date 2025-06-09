@@ -9,7 +9,6 @@
 #' @param configuration Index vector for the current configuration
 #'
 #' @return Numeric value of the log Bayes factor for the configuration
-#' @export
 #'
 #' @examples
 .eval_logbf <- function(z_RMi_R, I_tR_RMi_R, configuration){

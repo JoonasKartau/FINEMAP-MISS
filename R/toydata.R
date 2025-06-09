@@ -1,0 +1,22 @@
+#' Example Toy Dataset
+#'
+#' A small toy dataset for testing the functionality of FINEMAPMISS
+#'
+#' Features two simulated GWAS for the same phenotype.
+#' Generated using genotype data from 1000 genomes.
+#' (p = 119, number of variants)
+#' @format list:
+#' \describe{
+#'   \item{betas}{numeric matrix (p x 2), marginal effects}
+#'   \item{ses}{numeric matrix (p x 2), marginal effect standard errors.}
+#'   \item{MAF}{numeric matrix (p x 2), minor allele frequencies}
+#'   \item{LD}{numeric matrix (p x p), LD matrix}
+#'   \item{study_sample_sizes}{numeric vector, sample size per study}
+#'   \item{causal_snp}{numeric, causal_snp index}
+#' }
+#' @usage data("toydata_FINEMAPMISS")
+#' @source Genotype subset taken from <ftp://ftp.1000genomes.ebi.ac.uk/vol1/ftp/release/20130502/ALL.chr6.phase3_shapeit2_mvncall_integrated_v5b.20130502.genotypes.vcf.gz>
+#' @examples
+#' data("toydata_FINEMAPMISS")
+#' head(toydata_FINEMAPMISS)
+"toydata_FINEMAPMISS"
