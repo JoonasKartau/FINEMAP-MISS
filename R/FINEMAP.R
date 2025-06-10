@@ -103,13 +103,13 @@
 #'
 #'imputation1 <- impute_summary_stats(R = LD, z = z_obs1,
 #'                                     observed = obs1,
-#'                                     unobserved = unobs1, n = n,
+#'                                     unobserved = unobs1, n = n[1],
 #'                                     return_z = FALSE, scale = TRUE)
 #'
 #'
 #'imputation2 <- impute_summary_stats(R = LD, z = z_obs2,
 #'                                    observed = obs2,
-#'                                    unobserved = unobs2, n = n,
+#'                                    unobserved = unobs2, n = n[2],
 #'                                    return_z = FALSE, scale = TRUE)
 #'
 #'#Copying over summary statistics
@@ -133,6 +133,8 @@
 #'                          n_studies = 2,
 #'                          variant_sample_sizes = variant_sample_sizes,
 #'                          freqs = MAF)
+#'
+#'
 #'
 #'
 original_FINEMAP <- function(ses, betas, R, tau = 0.05,

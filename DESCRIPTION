@@ -11,3 +11,7 @@ LazyData: true
 RoxygenNote: 7.3.2
 Depends: 
     R (>= 3.5)
+Suggests: 
+    knitr,
+    rmarkdown
+VignetteBuilder: knitr

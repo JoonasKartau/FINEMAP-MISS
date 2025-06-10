@@ -2,7 +2,6 @@
 
 export(.create_RM_matrix)
 export(FINEMAPMISS)
-export(FINEMAPMISS_debug)
 export(IVW)
 export(impute_summary_stats)
 export(logsumexp)
