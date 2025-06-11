@@ -105,7 +105,7 @@
 #'                          freqs = MAF)
 #'
 #'
-FINEMAPMISS <- function(ses, betas, R, n_studies, variant_sample_sizes = NULL,
+FINEMAPMISS <- function(betas, ses, R, n_studies, variant_sample_sizes = NULL,
                         freqs, INFO = NULL,
                         tau = 0.05, adj = 0.0001,
                              n_reps = 50,

@@ -72,7 +72,6 @@ impute_summary_stats <- function(R, z, observed, unobserved, shrink = 0.0001, re
     if(return_z == T){
       return(cbind("z" = imputed_z/sqrt(imputed_z_var), "Quality" = imputed_z_var))
     } else {
-      #return(cbind("beta" = imputed_z/sqrt(imputed_z_var)/sqrt(n), "Quality" = imputed_z_var, "se" = 1/sqrt(n)/sqrt(imputed_z_var)))
       return(cbind("beta" = imputed_z/sqrt(n)/sqrt(imputed_z_var), "Quality" = imputed_z_var, "se" = 1/sqrt(n)))
     }
   } else {
