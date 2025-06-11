@@ -5,8 +5,8 @@
 \title{Fine-mapping meta-analyses with missing information}
 \usage{
 FINEMAPMISS(
-  ses,
   betas,
+  ses,
   R,
   n_studies,
   variant_sample_sizes = NULL,
@@ -29,17 +29,17 @@ FINEMAPMISS(
 )
 }
 \arguments{
-\item{ses}{A vector or matrix of GWAS marginal effect standard errors \eqn{\boldsymbol{s}}.
-Takes the form of a vector if there is only a single dataset or the data has
-been combined in advance. Otherwise, it is a matrix where each column contains
-the standard errors for one dataset. For any unobserved variants in a study,
-the standard errors should be set to \code{Inf}.}
-
 \item{betas}{A vector or matrix of GWAS marginal effects \eqn{\boldsymbol{\widehat \beta}}.
 Takes the form of a vector if there is only a single dataset or the data has
 been combined in advance. Otherwise, it is a matrix where each column contains
 the marginal effects for one dataset. For any unobserved variants in a study,
 the marginal effects should be set to \code{0}.}
+
+\item{ses}{A vector or matrix of GWAS marginal effect standard errors \eqn{\boldsymbol{s}}.
+Takes the form of a vector if there is only a single dataset or the data has
+been combined in advance. Otherwise, it is a matrix where each column contains
+the standard errors for one dataset. For any unobserved variants in a study,
+the standard errors should be set to \code{Inf}.}
 
 \item{R}{Reference LD matrix \eqn{\boldsymbol{R}} for the set of analyzed variants.}
 
