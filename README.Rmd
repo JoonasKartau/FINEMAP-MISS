@@ -18,5 +18,5 @@ devtools::install_github("JoonasKartau/FINEMAP-MISS")
 ## Example run
 
 In the vignettes folder in the GitHub repository, an example of fine-mapping
-withFINEMAP-MISS is provided.
+with FINEMAP-MISS is provided.
 
