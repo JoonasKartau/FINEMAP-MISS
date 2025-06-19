@@ -5,8 +5,8 @@
 \title{Fine-mapping meta-analyses with missing information}
 \usage{
 original_FINEMAP(
-  ses,
   betas,
+  ses,
   R,
   tau = 0.05,
   n_reps = 50,
@@ -25,21 +25,27 @@ original_FINEMAP(
   scaled_data = F,
   use_N = F,
   INFO = NULL,
-  cholesky = T
+  cholesky = T,
+  rsid = NULL,
+  position = NULL,
+  allele1 = NULL,
+  allele2 = NULL,
+  chromosome = NULL,
+  export_configs = FALSE
 )
 }
 \arguments{
-\item{ses}{A vector or matrix of GWAS marginal effect standard errors.
-Takes the form of a vector if there is only a single dataset or the data has
-been combined in advance. Otherwise, it is a matrix where each column contains
-the standard errors for one dataset. For any unobserved variants in a study,
-the standard errors should be set to \code{Inf}.}
-
 \item{betas}{A vector or matrix of GWAS marginal effects.
 Takes the form of a vector if there is only a single dataset or the data has
 been combined in advance. Otherwise, it is a matrix where each column contains
 the marginal effects for one dataset. For any unobserved variants in a study,
 the marginal effects should be set to \code{0}.}
+
+\item{ses}{A vector or matrix of GWAS marginal effect standard errors.
+Takes the form of a vector if there is only a single dataset or the data has
+been combined in advance. Otherwise, it is a matrix where each column contains
+the standard errors for one dataset. For any unobserved variants in a study,
+the standard errors should be set to \code{Inf}.}
 
 \item{R}{Reference LD matrix for the set of analyzed variants.}
 
@@ -87,16 +93,43 @@ for fine-mapping?}
 \item{INFO}{Vector of variant imputation INFO scores.}
 
 \item{cholesky}{Is cholesky decomposition used for matrix inversion? If not base R \code{solve} is used.}
+
+\item{rsid}{rsid vector (optional identifier).}
+
+\item{position}{position vector (optional identifier).}
+
+\item{allele1}{reference allele vector (optional identifier).}
+
+\item{allele2}{alternate allele vector (optional identifier).}
+
+\item{chromosome}{chromosome vector (optional identifier).}
 }
 \value{
 A list of objects
 \describe{
-  \item{\code{pips}}{Numeric vector of posterior inclusion probabilities per variant.}
-  \item{\code{stored_configs}}{A matrix of evaluated configurations and associated information.
-   Columns: 1. causal configuration, 2. log Bayes-factor, 3. size of configuration, 4. Is this a unique configuration?}
+  \item{\code{summary_table}}{Data frame with entries:
+  \itemize{
+  \item{\code{rank}: The order in which the variants appear when sorted by PIP.}
+  \item{\code{rsid}: Rsid (if supplied, NA otherwise).}
+  \item{\code{chromosome}: Chromosome (if supplied, NA otherwise).}
+  \item{\code{allele1}: Allele1 (if supplied, NA otherwise).}
+  \item{\code{allele2}: Allele2 (if supplied, NA otherwise).}
+  \item{\code{maf}: Minor allele frequency.}
+  \item{\code{beta}: Marginal effect.}
+  \item{\code{se}: Standard error.}
+  \item{\code{z}: Z-score.}
+  \item{\code{prob}: Posterior inclusion probability (PIP).}
+  }}
   \item{\code{cred}}{List or matrix of credible sets.}
   \item{\code{post_k}}{Posterior probability distribution for the number of causal variants from \code{0:max_causals}}
-}
+  \item{\code{evaluated_configs}}{Optional output if \code{export_configs == TRUE}. Data frame of evaluated configurations and associated information.
+  \itemize{
+   \item{\code{configuration}: Causal configuration.}
+   \item{\code{log_bf}: Causal configuration log Bayes-factor.}
+   \item{\code{config_size}: Causal configuration size (how many causal variants?).}
+   \item{\code{unique_config}: Is this a unique configuration?.}
+  }}
+ }
 }
 \description{
 \code{FINEMAP} performs Bayesian variable selection on a set of genetic

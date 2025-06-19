@@ -44,15 +44,37 @@
 #' for fine-mapping?
 #' @param INFO Vector of variant imputation INFO scores.
 #' @param cholesky Is cholesky decomposition used for matrix inversion? If not base R \code{solve} is used.
+#' @param rsid rsid vector (optional identifier).
+#' @param chromosome chromosome vector (optional identifier).
+#' @param position position vector (optional identifier).
+#' @param allele1 reference allele vector (optional identifier).
+#' @param allele2 alternate allele vector (optional identifier).
 #'
 #' @return A list of objects
 #' \describe{
-#'   \item{\code{pips}}{Numeric vector of posterior inclusion probabilities per variant.}
-#'   \item{\code{stored_configs}}{A matrix of evaluated configurations and associated information.
-#'    Columns: 1. causal configuration, 2. log Bayes-factor, 3. size of configuration, 4. Is this a unique configuration?}
+#'   \item{\code{summary_table}}{Data frame with entries:
+#'   \itemize{
+#'   \item{\code{rank}: The order in which the variants appear when sorted by PIP.}
+#'   \item{\code{rsid}: Rsid (if supplied, NA otherwise).}
+#'   \item{\code{chromosome}: Chromosome (if supplied, NA otherwise).}
+#'   \item{\code{allele1}: Allele1 (if supplied, NA otherwise).}
+#'   \item{\code{allele2}: Allele2 (if supplied, NA otherwise).}
+#'   \item{\code{maf}: Minor allele frequency.}
+#'   \item{\code{beta}: Marginal effect.}
+#'   \item{\code{se}: Standard error.}
+#'   \item{\code{z}: Z-score.}
+#'   \item{\code{prob}: Posterior inclusion probability (PIP).}
+#'   }}
 #'   \item{\code{cred}}{List or matrix of credible sets.}
 #'   \item{\code{post_k}}{Posterior probability distribution for the number of causal variants from \code{0:max_causals}}
-#' }
+#'   \item{\code{evaluated_configs}}{Optional output if \code{export_configs == TRUE}. Data frame of evaluated configurations and associated information.
+#'   \itemize{
+#'    \item{\code{configuration}: Causal configuration.}
+#'    \item{\code{log_bf}: Causal configuration log Bayes-factor.}
+#'    \item{\code{config_size}: Causal configuration size (how many causal variants?).}
+#'    \item{\code{unique_config}: Is this a unique configuration?.}
+#'   }}
+#'  }
 
 #' @export
 #'
@@ -137,17 +159,33 @@
 #'
 #'
 #'
-original_FINEMAP <- function(ses, betas, R, tau = 0.05,
-                        n_reps = 50,
-                        prob_threshold = 0.001, max_causals = 5,
-                        cred_sizes = NULL, cred_eval = T, meta_analyze = T,
-                        quiet = T,
-                        RM = NULL,
-                        estimate_M = FALSE, n_studies,
-                        variant_sample_sizes = NULL,
-                        max_overlap = T, freqs,
-                        scaled_data = F, use_N = F, INFO = NULL,
-                        cholesky = T){
+#'
+original_FINEMAP <- function(betas,
+                             ses,
+                             R,
+                             tau = 0.05,
+                             n_reps = 50,
+                             prob_threshold = 0.001,
+                             max_causals = 5,
+                             cred_sizes = NULL,
+                             meta_analyze = T,
+                             quiet = T,
+                             RM = NULL,
+                             estimate_M = FALSE,
+                             n_studies,
+                             variant_sample_sizes = NULL,
+                             max_overlap = T,
+                             freqs,
+                             scaled_data = F,
+                             use_N = F,
+                             INFO = NULL,
+                             cholesky = T,
+                             rsid = NULL,
+                             position = NULL,
+                             allele1 = NULL,
+                             allele2 = NULL,
+                             chromosome = NULL,
+                             export_configs = FALSE){
 
   #Changing input into matrix form.
   p <- dim(ses)[1]
@@ -244,6 +282,7 @@ original_FINEMAP <- function(ses, betas, R, tau = 0.05,
     se_meta <- meta_analysis[[2]]
 
     INFO_meta <- IVW(betas = INFO, ses = ses)[[1]]
+    MAF_meta <- IVW(betas = freqs, ses = ses)[[1]]
 
 
   } else {
@@ -254,6 +293,7 @@ original_FINEMAP <- function(ses, betas, R, tau = 0.05,
     } else {
       INFO_meta <- INFO
     }
+    MAF_meta <- freqs
   }
   z <- beta_meta/se_meta
 
@@ -426,9 +466,9 @@ original_FINEMAP <- function(ses, betas, R, tau = 0.05,
     k_ind <- which((stored_config_sizes == ii)&(stored_unique_configs == T))
     post_k[ii] <- sum((exp(stored_log_bf[k_ind] - lse)))
   }
-
+  names(post_k) <- c(1:max_causals)
   # Evaluating credible sets
-  if(cred_eval == T){
+
     print("Credible Sets")
     cred <- .create_credible_sets_FM(cred_sizes = cred_sizes,
                                   post_k = post_k,
@@ -445,15 +485,48 @@ original_FINEMAP <- function(ses, betas, R, tau = 0.05,
                                   R = R,
                                   z = z,
                                   tau = tau)
-  } else {
-    cred <- NULL
-  }
+
 
 
   # Returning grouped pips, individual pips, snp groups and stored_configs.
-  return(list("pips" = pips,
-              "stored_configs" = cbind(stored_configs, stored_log_bf, stored_config_sizes, stored_unique_configs),
-              "cred" = cred,
-              "post_k" = post_k))
+  summary_table <- data.frame("rank" = order(pips, decreasing = T),
+                              "rsid" = if(is.null(rsid)){rep(NA, p)} else {rsid},
+                              "chromosome" = if(is.null(chromosome)){rep(NA, p)} else {chromosome},
+                              "position" = if(is.null(position)){rep(NA, p)} else {position},
+                              "allele1" = if(is.null(allele1)){rep(NA, p)} else {allele1},
+                              "allele2" = if(is.null(allele2)){rep(NA, p)} else {allele2},
+                              "maf" = if(meta_analyze){MAF_meta} else {freqs},
+                              "beta" = beta_meta,
+                              "se" = se_meta,
+                              "z" = z,
+                              "prob" = pips)
+
+
+  cred_cols <- ncol(cred)
+  colnames(cred) <- 1:ncol(cred)
+  for(ii in 1:(cred_cols/2)){
+    colnames(cred)[(2*ii - 1):(2*ii)] <- c(paste0("CS", ii, "_variants"), paste0("CS", ii, "_prob"))
+  }
+
+  PENC <- sum(post_k*(1:max_causals))
+
+
+  if(export_configs == T){
+    evaluated_configs <- data.frame("configuration" = stored_configs,
+                                    "log_bf" = stored_log_bf,
+                                    "config_size" = stored_config_sizes,
+                                    "unique_config" = stored_unique_configs)
+
+    return(list("summary_table" = summary_table,
+                "credible_sets" = cred,
+                "post_prob_n_causal_variants" = post_k,
+                "post_expected_n_causal_variants" = PENC,
+                "evaluated_configs" = evaluated_configs))
+  } else {
+    return(list("summary_table" = summary_table,
+                "credible_sets" = cred,
+                "post_prob_n_causal_variants" = post_k,
+                "post_expected_n_causal_variants" = PENC))
+  }
 }
 

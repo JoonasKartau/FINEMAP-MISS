@@ -13,7 +13,6 @@
 #'
 #' @return Initial configuration for the next iteration of SSS.
 #'
-#' @examples
 .sample_new_config <- function(init_config,
                                init_configs,
                                prob,

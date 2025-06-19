@@ -9,7 +9,6 @@
 #'
 #' @return log-density of the observed point x.
 #'
-#' @examples
 .log_dmvnorm <- function(x,
                         mu = rep(0, length(x)),
                         S = diag(1, length(x)),

@@ -14,7 +14,6 @@
 #'
 #' @return Numeric vector of PIPs for each variant.
 #'
-#' @examples
 .calculate_pips <- function(init_configs,
                             p,
                             stored_init_config_sizes,

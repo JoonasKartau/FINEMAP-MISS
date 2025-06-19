@@ -22,7 +22,6 @@
 #' @return List of credible sets as matrices for each 'cred_size' in 'cred_sizes'. If 'length(cred_sizes) == 1', then the
 #' single credible set matrix is returned.
 #'
-#' @examples
 .create_credible_sets <- function(cred_sizes,
                                   post_k,
                                   max_causals,

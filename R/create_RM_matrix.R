@@ -33,7 +33,6 @@
 #' @return z-score covariance matrix \eqn{\boldsymbol{R_M}}
 #' @export
 #'
-#' @examples
 #'
 #'
 .create_RM_matrix <- function(ses, betas = NULL, INFO, R, beta_shrink = T, n_studies, p,

@@ -84,10 +84,10 @@ If we try to fine-map this partially missing data with FINEMAP, we cannot detect
 
 FM_output <- original_FINEMAP(ses = ses, betas = betas, R = LD, n_studies = 2,
                               freqs = MAF, variant_sample_sizes = variant_sample_sizes)
-plot(FM_output$pips, ylab = "PIP", main = "FINEMAP PIPs")
-points(toydata_FINEMAPMISS$causal_snp, FM_output$pips[toydata_FINEMAPMISS$causal_snp],
+plot(FM_output$summary_table$prob, ylab = "PIP", main = "FINEMAP PIPs")
+points(toydata_FINEMAPMISS$causal_snp, FM_output$summary_table$prob[toydata_FINEMAPMISS$causal_snp],
        pch = 21, bg = "green")
-points(FM_output$cred[,1], FM_output$pips[FM_output$cred[,1]],
+points(FM_output$credible_sets[,1], FM_output$summary_table$prob[FM_output$cred[,1]],
        col = "red")
 legend("topleft", pch = c(21,1), legend = c("Causal variant", "Credible set"), pt.bg = c("green", NA),
        col = c("black", "red"))
@@ -101,10 +101,10 @@ FMM_output <- FINEMAPMISS(ses = ses, betas = betas, R = LD,
                           n_studies = 2, freqs = MAF, 
                           variant_sample_sizes = variant_sample_sizes,
                           scaled_data = T)
-plot(FMM_output$pips, ylab = "PIP", main = "FINEMAP-MISS PIPs")
-points(toydata_FINEMAPMISS$causal_snp, FMM_output$pips[toydata_FINEMAPMISS$causal_snp],
+plot(FMM_output$summary_table$prob, ylab = "PIP", main = "FINEMAP-MISS PIPs")
+points(toydata_FINEMAPMISS$causal_snp, FMM_output$summary_table$prob[toydata_FINEMAPMISS$causal_snp],
        pch = 21, bg = "green")
-points(FMM_output$cred[,1], FMM_output$pips[FMM_output$cred[,1]],
+points(FMM_output$credible_sets[,1], FMM_output$summary_table$prob[FMM_output$credible_sets[,1]],
        col = "red")
 legend("topleft", pch = c(21,1), legend = c("Causal variant", "Credible set"), pt.bg = c("green", NA),
        col = c("black", "red"))
@@ -162,10 +162,10 @@ FM_imputed_output <- original_FINEMAP(ses = ses_imputed,
                          variant_sample_sizes = variant_sample_sizes,
                          freqs = toydata_FINEMAPMISS$MAF, scaled_data = T)
 
-plot(FM_imputed_output$pips, ylab = "PIP", main = "FINEMAP PIPs")
-points(toydata_FINEMAPMISS$causal_snp, FM_imputed_output$pips[toydata_FINEMAPMISS$causal_snp],
+plot(FM_imputed_output$summary_table$prob, ylab = "PIP", main = "FINEMAP PIPs")
+points(toydata_FINEMAPMISS$causal_snp, FM_imputed_output$summary_table$prob[toydata_FINEMAPMISS$causal_snp],
        pch = 21, bg = "green")
-points(FM_imputed_output$cred[,1], FM_imputed_output$pips[FM_imputed_output$cred[,1]],
+points(FM_imputed_output$cred[,1], FM_imputed_output$summary_table$prob[FM_imputed_output$credible_sets[,1]],
        col = "red")
 legend("topleft", pch = c(21,1), legend = c("Causal variant", "Credible set"), pt.bg = c("green", NA),
        col = c("black", "red"))

@@ -4,11 +4,11 @@
 #' variants and a phenotype, using marginal effect estimates \eqn{\boldsymbol{\widehat \beta}},
 #'  their standard errors \eqn{\boldsymbol{s}}, and  a reference LD panel \eqn{\boldsymbol{R}}
 #'  as input. \cr
-#'  \code{FINEMAPMISS} differs from previous methods, as it allows for the combination
+#'  \code{FINEMAPMISS} differs from previous fine-mapping methods, as it allows for the combination
 #'  of multiple datasets across biobanks, while also functioning with missing data. \cr
 #'  If given separate datasets, this function will automatically perform the meta-analysis
 #'  and fine-map the data. \cr
-#'  If the data have been combined into a single dataset in advance, \code{FINEMAPMISS}
+#'  If the data are combined into a single dataset in advance, \code{FINEMAPMISS}
 #'  can still be run, but with reduced accuracy.
 #'
 #' @param ses A vector or matrix of GWAS marginal effect standard errors \eqn{\boldsymbol{s}}.
@@ -53,14 +53,36 @@
 #' @param use_N Should the variant sample sizes be used for fine-mapping, instead of the
 #' GWAS standard errors? (experimental)
 #' @param INFO_prior Should the INFO scores be used to scale the prior? (experimental)
+#' @param rsid rsid vector (optional identifier).
+#' @param chromosome chromosome vector (optional identifier).
+#' @param position position vector (optional identifier).
+#' @param allele1 reference allele vector (optional identifier).
+#' @param allele2 alternate allele vector (optional identifier).
 #'
 #' @return A list of objects
 #' \describe{
-#'   \item{\code{pips}}{Numeric vector of posterior inclusion probabilities per variant.}
-#'   \item{\code{stored_configs}}{A matrix of evaluated configurations and associated information.
-#'    Columns: 1. causal configuration, 2. log Bayes-factor, 3. size of configuration, 4. Is this a unique configuration?}
+#'   \item{\code{summary_table}}{Data frame with entries:
+#'   \itemize{
+#'   \item{\code{rank}: The order in which the variants appear when sorted by PIP.}
+#'   \item{\code{rsid}: Rsid (if supplied, NA otherwise).}
+#'   \item{\code{chromosome}: Chromosome (if supplied, NA otherwise).}
+#'   \item{\code{allele1}: Allele1 (if supplied, NA otherwise).}
+#'   \item{\code{allele2}: Allele2 (if supplied, NA otherwise).}
+#'   \item{\code{maf}: Minor allele frequency.}
+#'   \item{\code{beta}: Marginal effect.}
+#'   \item{\code{se}: Standard error.}
+#'   \item{\code{z}: Z-score.}
+#'   \item{\code{prob}: Posterior inclusion probability (PIP).}
+#'   }}
 #'   \item{\code{cred}}{List or matrix of credible sets.}
 #'   \item{\code{post_k}}{Posterior probability distribution for the number of causal variants from \code{0:max_causals}}
+#'   \item{\code{evaluated_configs}}{Optional output if \code{export_configs == TRUE}. Data frame of evaluated configurations and associated information.
+#'   \itemize{
+#'    \item{\code{configuration}: Causal configuration.}
+#'    \item{\code{log_bf}: Causal configuration log Bayes-factor.}
+#'    \item{\code{config_size}: Causal configuration size (how many causal variants?).}
+#'    \item{\code{unique_config}: Is this a unique configuration?.}
+#'   }}
 #' }
 
 #' @export
@@ -105,18 +127,33 @@
 #'                          freqs = MAF)
 #'
 #'
-FINEMAPMISS <- function(betas, ses, R, n_studies, variant_sample_sizes = NULL,
-                        freqs, INFO = NULL,
-                        tau = 0.05, adj = 0.0001,
-                             n_reps = 50,
-                             prob_threshold = 0.001, max_causals = 5,
-                             cred_sizes = NULL,
-                             quiet = F, adj_match = T,
-                             RM = NULL,
-                             estimate_M = FALSE,
-                             max_overlap = T,
-                             scaled_data = F, use_N = T,
-                             INFO_prior = T){
+FINEMAPMISS <- function(betas,
+                        ses,
+                        R,
+                        n_studies,
+                        variant_sample_sizes = NULL,
+                        freqs,
+                        INFO = NULL,
+                        tau = 0.05,
+                        adj = 0.0001,
+                        n_reps = 50,
+                        prob_threshold = 0.001,
+                        max_causals = 5,
+                        cred_sizes = NULL,
+                        quiet = F,
+                        adj_match = T,
+                        RM = NULL,
+                        estimate_M = FALSE,
+                        max_overlap = T,
+                        scaled_data = F,
+                        use_N = T,
+                        INFO_prior = T,
+                        rsid = NULL,
+                        position = NULL,
+                        allele1 = NULL,
+                        allele2 = NULL,
+                        chromosome = NULL,
+                        export_configs = FALSE){
 
 
   #Changing input into matrix form.
@@ -242,6 +279,7 @@ FINEMAPMISS <- function(betas, ses, R, n_studies, variant_sample_sizes = NULL,
     se_meta <- meta_analysis[[2]]
 
     INFO_meta <- IVW(betas = INFO, ses = ses)[[1]]
+    MAF_meta <- IVW(betas = freqs, ses = ses)[[1]]
 
 
   } else {
@@ -252,6 +290,7 @@ FINEMAPMISS <- function(betas, ses, R, n_studies, variant_sample_sizes = NULL,
     } else {
       INFO_meta <- INFO
     }
+    MAF_meta <- freqs
   }
 
   # Creating sample size overlap matrix M
@@ -455,7 +494,7 @@ FINEMAPMISS <- function(betas, ses, R, n_studies, variant_sample_sizes = NULL,
     k_ind <- which((stored_config_sizes == ii)&(stored_unique_configs == T))
     post_k[ii] <- sum((exp(stored_log_bf[k_ind] - lse)))
   }
-
+  names(post_k) <- c(1:max_causals)
   # Evaluating credible sets
 
     print("Credible Sets")
@@ -474,11 +513,46 @@ FINEMAPMISS <- function(betas, ses, R, n_studies, variant_sample_sizes = NULL,
 
 
   # Returning grouped pips, individual pips, snp groups and stored_configs.
+  summary_table <- data.frame("rank" = order(pips, decreasing = T),
+                              "rsid" = if(is.null(rsid)){rep(NA, p)} else {rsid},
+                              "chromosome" = if(is.null(chromosome)){rep(NA, p)} else {chromosome},
+                              "position" = if(is.null(position)){rep(NA, p)} else {position},
+                              "allele1" = if(is.null(allele1)){rep(NA, p)} else {allele1},
+                              "allele2" = if(is.null(allele2)){rep(NA, p)} else {allele2},
+                              "maf" = if(meta_analyze){MAF_meta} else {freqs},
+                              "beta" = beta_meta,
+                              "se" = se_meta,
+                              "z" = z,
+                              "prob" = pips)
 
-    return(list("pips" = pips,
-                "stored_configs" = cbind(stored_configs, stored_log_bf, stored_config_sizes, stored_unique_configs),
-                "cred" = cred,
-                "post_k" = post_k))
+
+  cred_cols <- ncol(cred)
+  colnames(cred) <- 1:ncol(cred)
+  for(ii in 1:(cred_cols/2)){
+    colnames(cred)[(2*ii - 1):(2*ii)] <- c(paste0("CS", ii, "_variants"), paste0("CS", ii, "_prob"))
+  }
+
+PENC <- sum(post_k*(1:max_causals))
+
+
+  if(export_configs == T){
+    evaluated_configs <- data.frame("configuration" = stored_configs,
+                                "log_bf" = stored_log_bf,
+                                "config_size" = stored_config_sizes,
+                                "unique_config" = stored_unique_configs)
+
+    return(list("summary_table" = summary_table,
+                "credible_sets" = cred,
+                "post_prob_n_causal_variants" = post_k,
+                "post_expected_n_causal_variants" = PENC,
+                "evaluated_configs" = evaluated_configs))
+  } else {
+    return(list("summary_table" = summary_table,
+                "credible_sets" = cred,
+                "post_prob_n_causal_variants" = post_k,
+                "post_expected_n_causal_variants" = PENC))
+  }
+
 
 
 }

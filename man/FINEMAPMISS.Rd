@@ -25,7 +25,13 @@ FINEMAPMISS(
   max_overlap = T,
   scaled_data = F,
   use_N = T,
-  INFO_prior = T
+  INFO_prior = T,
+  rsid = NULL,
+  position = NULL,
+  allele1 = NULL,
+  allele2 = NULL,
+  chromosome = NULL,
+  export_configs = FALSE
 )
 }
 \arguments{
@@ -91,15 +97,42 @@ overlap is assumed when estimating \eqn{\boldsymbol{M}}.}
 GWAS standard errors? (experimental)}
 
 \item{INFO_prior}{Should the INFO scores be used to scale the prior? (experimental)}
+
+\item{rsid}{rsid vector (optional identifier).}
+
+\item{position}{position vector (optional identifier).}
+
+\item{allele1}{reference allele vector (optional identifier).}
+
+\item{allele2}{alternate allele vector (optional identifier).}
+
+\item{chromosome}{chromosome vector (optional identifier).}
 }
 \value{
 A list of objects
 \describe{
-  \item{\code{pips}}{Numeric vector of posterior inclusion probabilities per variant.}
-  \item{\code{stored_configs}}{A matrix of evaluated configurations and associated information.
-   Columns: 1. causal configuration, 2. log Bayes-factor, 3. size of configuration, 4. Is this a unique configuration?}
+  \item{\code{summary_table}}{Data frame with entries:
+  \itemize{
+  \item{\code{rank}: The order in which the variants appear when sorted by PIP.}
+  \item{\code{rsid}: Rsid (if supplied, NA otherwise).}
+  \item{\code{chromosome}: Chromosome (if supplied, NA otherwise).}
+  \item{\code{allele1}: Allele1 (if supplied, NA otherwise).}
+  \item{\code{allele2}: Allele2 (if supplied, NA otherwise).}
+  \item{\code{maf}: Minor allele frequency.}
+  \item{\code{beta}: Marginal effect.}
+  \item{\code{se}: Standard error.}
+  \item{\code{z}: Z-score.}
+  \item{\code{prob}: Posterior inclusion probability (PIP).}
+  }}
   \item{\code{cred}}{List or matrix of credible sets.}
   \item{\code{post_k}}{Posterior probability distribution for the number of causal variants from \code{0:max_causals}}
+  \item{\code{evaluated_configs}}{Optional output if \code{export_configs == TRUE}. Data frame of evaluated configurations and associated information.
+  \itemize{
+   \item{\code{configuration}: Causal configuration.}
+   \item{\code{log_bf}: Causal configuration log Bayes-factor.}
+   \item{\code{config_size}: Causal configuration size (how many causal variants?).}
+   \item{\code{unique_config}: Is this a unique configuration?.}
+  }}
 }
 }
 \description{
@@ -107,11 +140,11 @@ A list of objects
 variants and a phenotype, using marginal effect estimates \eqn{\boldsymbol{\widehat \beta}},
  their standard errors \eqn{\boldsymbol{s}}, and  a reference LD panel \eqn{\boldsymbol{R}}
  as input. \cr
- \code{FINEMAPMISS} differs from previous methods, as it allows for the combination
+ \code{FINEMAPMISS} differs from previous fine-mapping methods, as it allows for the combination
  of multiple datasets across biobanks, while also functioning with missing data. \cr
  If given separate datasets, this function will automatically perform the meta-analysis
  and fine-map the data. \cr
- If the data have been combined into a single dataset in advance, \code{FINEMAPMISS}
+ If the data are combined into a single dataset in advance, \code{FINEMAPMISS}
  can still be run, but with reduced accuracy.
 }
 \examples{

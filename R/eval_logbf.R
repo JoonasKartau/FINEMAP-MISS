@@ -10,7 +10,6 @@
 #'
 #' @return Numeric value of the log Bayes factor for the configuration
 #'
-#' @examples
 .eval_logbf <- function(z_RMi_R, I_tR_RMi_R, configuration){
   if(length(configuration) > 1){
     return(-0.5*(determinant(I_tR_RMi_R[configuration, configuration], logarithm = T)$modulus - t(z_RMi_R[configuration, ]) %*% solve(I_tR_RMi_R[configuration, configuration]) %*% z_RMi_R[configuration, ]))
