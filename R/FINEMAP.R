@@ -501,6 +501,9 @@ original_FINEMAP <- function(betas,
                               "z" = z,
                               "prob" = pips)
 
+  if(!is.matrix(cred)){
+    cred <- matrix(cred, ncol = length(cred))
+  }
 
   cred_cols <- ncol(cred)
   colnames(cred) <- 1:ncol(cred)

@@ -526,6 +526,10 @@ FINEMAPMISS <- function(betas,
                               "prob" = pips)
 
 
+  if(!is.matrix(cred)){
+    cred <- matrix(cred, ncol = length(cred))
+  }
+
   cred_cols <- ncol(cred)
   colnames(cred) <- 1:ncol(cred)
   for(ii in 1:(cred_cols/2)){
