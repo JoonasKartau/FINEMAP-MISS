@@ -13,7 +13,6 @@ original_FINEMAP(
   prob_threshold = 0.001,
   max_causals = 5,
   cred_sizes = NULL,
-  cred_eval = T,
   meta_analyze = T,
   quiet = T,
   RM = NULL,
@@ -60,8 +59,6 @@ the standard errors should be set to \code{Inf}.}
 \item{cred_sizes}{Vector or numeric of size of credible sets to be evaluated. If no value
 is provided, the rounded expected posterior for number of causal variants is used.}
 
-\item{cred_eval}{Binary variable, should credible sets be computed?}
-
 \item{meta_analyze}{Binary variable, should the data be meta-analyzed? If data has been
 combined in advance, should be set to \code{FALSE}.}
 
@@ -103,6 +100,8 @@ for fine-mapping?}
 \item{allele2}{alternate allele vector (optional identifier).}
 
 \item{chromosome}{chromosome vector (optional identifier).}
+
+\item{cred_eval}{Binary variable, should credible sets be computed?}
 }
 \value{
 A list of objects
@@ -215,6 +214,7 @@ output_FM <- original_FINEMAP(ses = ses,
                          n_studies = 2,
                          variant_sample_sizes = variant_sample_sizes,
                          freqs = MAF)
+
 
 
 

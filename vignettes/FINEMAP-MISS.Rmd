@@ -97,7 +97,7 @@ legend("topleft", pch = c(21,1), legend = c("Causal variant", "Credible set"), p
 With FINEMAP-MISS, the true causal variant is included in the credible set.
 ```{r FINEMAP-MISS}
 
-FMM_output <- FINEMAPMISS(ses = ses, betas = betas, R = LD, 
+FMM_output <- run_FINEMAPMISS(ses = ses, betas = betas, R = LD, 
                           n_studies = 2, freqs = MAF, 
                           variant_sample_sizes = variant_sample_sizes,
                           scaled_data = T)

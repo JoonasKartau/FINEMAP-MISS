@@ -118,7 +118,7 @@
 
     }
     if(length(cred_sizes) > 1){
-      cred_list[[which(cred_sizes %in% cred_size)]] <- cred
+      cred_list[[which(cred_sizes %in% cred_size)]]
     }
   }
   if(length(cred_sizes) > 1){

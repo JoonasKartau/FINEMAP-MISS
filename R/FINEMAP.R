@@ -522,6 +522,7 @@ original_FINEMAP <- function(betas,
                                     "log_bf" = stored_log_bf,
                                     "config_size" = stored_config_sizes,
                                     "unique_config" = stored_unique_configs)
+    evaluated_configs <- evaluated_configs[which(stored_unique_configs == TRUE), ]
 
     return(list("summary_table" = summary_table,
                 "credible_sets" = cred,
