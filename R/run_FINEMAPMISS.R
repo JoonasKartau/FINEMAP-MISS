@@ -359,9 +359,34 @@ run_FINEMAPMISS <- function(betas,
   diag(comp_R) <- 0
 
   # Setting an arbitrary initial configuration if not defined by user.
-  if(is.null(init_config)){
-    init_config <- sample(1:p, 1)
+
+
+
+  if(find_optimal_start == TRUE){
+    n_start_configs <- 1000
+    start_config_sizes <- 100
+    top_k_configs <- 100
+    inital_config_size <- 2
+
+    start_configs_matrix <- matrix(NA, nrow = n_start_configs, ncol = start_config_sizes)
+    log_bf <- vector()
+    for(kk in 1:n_start_configs){
+      config <- sort(sample(1:p, start_config_sizes))
+      start_configs_matrix[kk,] <- .eval_logbf(z_RMi_R = z_RMi_R, I_tR_RMi_R = I_tR_RMi_R, configuration = config)
+    }
+    recurring_variants <- matrix(NA, nrow = top_k_configs, ncol = p)
+    for(ii in 1:top_k_configs){
+      variant_index <- which(start_configs_matrix[order(log_bf, decreating = T)[1],] %in% start_configs_matrix[order(log_bf, decreating = T)[ii + 1],])
+      recurring_variants[ii,] <- start_configs_matrix[order(log_bf, decreating = T)[1],][variant_index]
+    }
+    init_config <- order(colSums(recurring_variants), decreasing = T)[1:initial_config_size]
+  } else {
+    if(is.null(init_config)){
+      init_config <- sample(1:p, 1)
+    }
   }
+
+
 
   config <- init_config
 

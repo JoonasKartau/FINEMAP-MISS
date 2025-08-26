@@ -31,7 +31,8 @@ run_FINEMAPMISS(
   allele1 = NULL,
   allele2 = NULL,
   chromosome = NULL,
-  export_configs = FALSE
+  export_configs = FALSE,
+  init_config = NULL
 )
 }
 \arguments{
@@ -107,6 +108,8 @@ GWAS standard errors? (experimental)}
 \item{allele2}{alternate allele vector (optional identifier).}
 
 \item{chromosome}{chromosome vector (optional identifier).}
+
+\item{init_config}{Initial configuration, from which fine-mapping is started.}
 }
 \value{
 A list of objects
