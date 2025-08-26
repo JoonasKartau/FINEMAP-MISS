@@ -366,9 +366,9 @@ run_FINEMAPMISS <- function(betas,
 
   if(find_optimal_start == TRUE){
     n_start_configs <- 1000
-    start_config_sizes <- 100
+    start_config_sizes <- min(100, p)
     top_k_configs <- 100
-    inital_config_size <- 2
+    initial_config_size <- 2
 
     start_configs_matrix <- matrix(NA, nrow = n_start_configs, ncol = start_config_sizes)
     log_bf <- vector()
@@ -378,8 +378,8 @@ run_FINEMAPMISS <- function(betas,
     }
     recurring_variants <- matrix(NA, nrow = top_k_configs, ncol = p)
     for(ii in 1:top_k_configs){
-      variant_index <- which(start_configs_matrix[order(log_bf, decreating = T)[1],] %in% start_configs_matrix[order(log_bf, decreating = T)[ii + 1],])
-      recurring_variants[ii,] <- start_configs_matrix[order(log_bf, decreating = T)[1],][variant_index]
+      variant_index <- which(start_configs_matrix[order(log_bf, decreasing = T)[1],] %in% start_configs_matrix[order(log_bf, decreasing = T)[ii + 1],])
+      recurring_variants[ii,] <- 1:p %in% start_configs_matrix[order(log_bf, decreasing = T)[1],][variant_index]
     }
     init_config <- order(colSums(recurring_variants), decreasing = T)[1:initial_config_size]
   } else {
