@@ -50,6 +50,7 @@
 #' the variant frequencies for one dataset. For any unobserved variants in a study,
 #' the marginal effects should be set to \code{0}.
 #' @param init_config Initial configuration, from which fine-mapping is started.
+#' @param find_optimal_start Should a search be made to find an optimal starting configuration for fine-mapping?
 #' @param scaled_data Has the data been scaled with allele frequencies in advance?
 #' @param use_N Should the variant sample sizes be used for fine-mapping, instead of the
 #' GWAS standard errors? (experimental)
@@ -155,7 +156,8 @@ run_FINEMAPMISS <- function(betas,
                         allele2 = NULL,
                         chromosome = NULL,
                         export_configs = FALSE,
-                        init_config = NULL){
+                        init_config = NULL,
+                        find_optimal_start = FALSE){
 
 
   #Changing input into matrix form.

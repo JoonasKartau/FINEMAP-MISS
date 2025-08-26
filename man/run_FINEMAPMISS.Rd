@@ -32,7 +32,8 @@ run_FINEMAPMISS(
   allele2 = NULL,
   chromosome = NULL,
   export_configs = FALSE,
-  init_config = NULL
+  init_config = NULL,
+  find_optimal_start = FALSE
 )
 }
 \arguments{
@@ -110,6 +111,8 @@ GWAS standard errors? (experimental)}
 \item{chromosome}{chromosome vector (optional identifier).}
 
 \item{init_config}{Initial configuration, from which fine-mapping is started.}
+
+\item{find_optimal_start}{Should a search be made to find an optimal starting configuration for fine-mapping?}
 }
 \value{
 A list of objects
